@@ -1,0 +1,76 @@
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
+
+int enableAPin = 3;
+int in1Pin = 4;
+int in2Pin = 5;
+int enableBPin = 6;  
+int in3Pin = 7;      
+int in4Pin = 8;
+
+const int calibrateSamples = 1000;  // Number of samples for gyroscope calibration
+int gzOffset;  // Gyroscope offset value
+
+void setup() {
+  pinMode(enableAPin, OUTPUT);
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enableBPin, OUTPUT);
+  pinMode(in3Pin, OUTPUT);
+  pinMode(in4Pin, OUTPUT);
+
+  Wire.begin();
+  mpu.initialize();
+
+  calibrateGyro();  // Calibrate the gyroscope
+}
+
+void loop() {
+  int16_t ax, ay, az, gx, gy, gz;
+  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
+  // Map the gyroscope Z-axis readings to motor speed
+  int motorPWMSpeed = map(gz - gzOffset, -2000, 2000, -255, 255);
+
+  // Control motors based on motorPWMSpeed
+  if (motorPWMSpeed > 0) {  // Move both motors forward
+    analogWrite(enableAPin, abs(motorPWMSpeed));
+    digitalWrite(in1Pin, HIGH);
+    digitalWrite(in2Pin, LOW);    
+    analogWrite(enableBPin, abs(motorPWMSpeed));
+    digitalWrite(in3Pin, HIGH);
+    digitalWrite(in4Pin, LOW);    
+  }  
+  else if (motorPWMSpeed < 0) {  // Move both motors backward
+    analogWrite(enableAPin, abs(motorPWMSpeed));
+    digitalWrite(in1Pin, LOW);
+    digitalWrite(in2Pin, HIGH);    
+    analogWrite(enableBPin, abs(motorPWMSpeed));
+    digitalWrite(in3Pin, LOW);
+    digitalWrite(in4Pin, HIGH);    
+  }  
+  else {  // Stop both motors
+    digitalWrite(in1Pin, LOW);
+    digitalWrite(in2Pin, LOW);    
+    digitalWrite(in3Pin, LOW);
+    digitalWrite(in4Pin, LOW);    
+  }
+
+  delay(100); // Adjust delay based on the update rate of the gyroscope data
+}
+
+void calibrateGyro() {
+  Serial.println("Calibrating gyroscope...");
+  long sum = 0;
+
+  for (int i = 0; i < calibrateSamples; ++i) {
+    int16_t gz = mpu.getRotationZ();  // Corrected function call
+    sum += gz;
+    delay(5);
+  }
+
+  gzOffset = sum / calibrateSamples;
+  Serial.println("Gyroscope calibration complete.");
+}
